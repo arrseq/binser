@@ -11,6 +11,7 @@
 // // var = 2 elems, 1 and 0
 // dec.decode_arr([ 0b00001010, 0b00000011, 0b00000100, 0b00001111, 0b00000000, 0b00000010, 0b00000001, 0b00000000 ]);
 
-import {parse_type} from "../src/type";
+import {parse_object, parse_type} from "../src/type";
 
-console.log(parse_type("f64"));
+let enm = parse_type("enum[8] [bool, u8], [bool], [u64]")!.value as any;
+console.log(enm.items);

@@ -30,7 +30,7 @@ export interface StringType { type: TypeName.String }
 export interface Enum {
     type: TypeName.Enum,
     key_size: Size,
-    items: Types
+    items: Types[]
 }
 export interface ArrayType {
     type: TypeName.Array,
@@ -47,8 +47,10 @@ export type Type = BoolType
     | IntType
     | FType
     | StringType
-    | Enum;
-export type Types = { [index: string]: Type };
+    | Enum
+    | ArrayType
+    | VectorType;
+export type Types = Type[];
 
 export function new_type(type: Type): Type { return type; }
 
@@ -65,6 +67,37 @@ export function parse_size(tstr: string): ParseResult<Size> | null {
     if (tstr.startsWith("32")) { return { value: Size.X32, length: 2 }; }
     if (tstr.startsWith("64")) { return { value: Size.X64, length: 2 }; }
     return null;
+}
+
+export function parse_object(o: string): ParseResult<Types> | null {
+    let l = 1;
+    o = o.substring(1);
+
+    let type_out: Types = [];
+
+    while (true) {
+        let ty = parse_type(o);
+        if (ty == null) { console.log("Invalid type", o); return null; }
+        l += ty.length;
+
+        type_out.push(ty.value);
+        o = o.substring(ty.length);
+
+        if (o.startsWith("]")) {
+            l += 1;
+            break;
+        }
+
+        if (o.startsWith(", ")) {
+            o = o.substring(2);
+            l += 2;
+        }
+    }
+
+    return new_result({
+        value: type_out,
+        length: l
+    });
 }
 
 export function parse_type(tstr: string): ParseResult<Type> | null {
@@ -118,12 +151,40 @@ export function parse_type(tstr: string): ParseResult<Type> | null {
     // [ty; le]
     // [ty]
 
-    let enum_word = "enum";
+    let enum_word = "enum[";
 
     if (tstr.startsWith(enum_word)) {
         tstr = tstr.substring(enum_word.length);
-        tstr.substring(1); // remove opening bracket.
+        len += enum_word.length;
 
+        let size = parse_size(tstr);
+        if (size == null) { return null; }
+        tstr = tstr.substring(size.length + 2); // remove closing bracket and space
+        len += size.length += 2;
+
+        let tys = [];
+
+        while (true) {
+            let obj = parse_object(tstr);
+            if (obj == null) { return null; }
+            tstr = tstr.substring(obj.length);
+            len += obj.length;
+
+            tys.push(obj.value);
+
+
+            // check for ", " to indicate next
+            let cs = ", ";
+            if (tstr.startsWith(cs)) {
+                tstr = tstr.substring(cs.length);
+                len += cs.length;
+            } else { break; }
+        }
+
+        return new_result({
+            value: new_type({ type: TypeName.Enum, key_size: size.value, items: tys }),
+            length: len
+        });
     } else if (tstr.startsWith("[") && tstr.endsWith("]")) {
 
     }
