@@ -166,6 +166,7 @@ export function parse_type(tstr: string): ParseResult<Type> | null {
     let enum_word = "enum[";
     let cs = ", ";
     let ss = "; ";
+    let string = "string";
 
     if (tstr.startsWith(enum_word)) {
         tstr = tstr.substring(enum_word.length);
@@ -237,6 +238,12 @@ export function parse_type(tstr: string): ParseResult<Type> | null {
                 type: TypeName.Vector,
                 item_type: ty.value
             }),
+            length: len
+        })
+    } else if (tstr.startsWith(string)) {
+        len += string.length;
+        return new_result({
+            value: new_type({ type: TypeName.String }),
             length: len
         })
     }

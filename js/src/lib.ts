@@ -15,6 +15,148 @@ export class Decoder<T> {
         });
     }
 
+    private read_array(length: bigint, itemType: Type, pos: bigint, buffer: Uint8Array): [any[], bigint] | null {
+        let arrayResult = [];
+        let initialPos = pos;
+
+        for (let i = 0n; i < length; i++) {
+            let element = this.decode_type(itemType, pos, buffer);
+            if (element == null) {
+                console.log(`Cannot decode array element at index ${i}`);
+                return null;
+            }
+            arrayResult.push(element[0]);
+            pos += element[1];
+        }
+
+        return [arrayResult, pos - initialPos];
+    }
+
+    private read_string(pos: bigint, buffer: Uint8Array): [string, bigint] | null {
+        const start = Number(pos);
+        const decoder = new TextDecoder('utf-8');
+
+        let end = start;
+        while (end < buffer.length && buffer[end] !== 0x00) {
+            end++;
+        }
+
+        const value = decoder.decode(buffer.slice(start, end));
+        return [value, BigInt(end - start)];
+    }
+
+    public decode_type(ty: Type, pos: bigint, buffer: Uint8Array): [any, bigint] | null {
+        let res: any = null;
+        let s_pos = pos;
+
+        switch (ty.type) {
+            case TypeName.Bool: {
+                let bool = this.read_bool(pos, buffer);
+                if (bool == null) {
+                    console.log("Cannot parse boolean");
+                    return null;
+                }
+                res = bool[0] >= 1;
+                pos += bool[1];
+                break;
+            }
+            case TypeName.U: {
+                let size = ty.size;
+                let uValue = this.read_u(size, pos, buffer);
+                if (uValue == null) {
+                    console.log("Cannot parse unsigned integer");
+                    return null;
+                }
+                res = uValue[0];
+                pos += uValue[1];
+                break;
+            }
+            case TypeName.I: {
+                let size = ty.size;
+                let uValue = this.read_i(size, pos, buffer);
+                if (uValue == null) {
+                    console.log("Cannot parse unsigned integer");
+                    return null;
+                }
+                res = uValue[0];
+                pos += uValue[1];
+                break;
+            }
+            case TypeName.F16: {
+                const f16Value = this.read_f(pos, buffer, Size.X16);
+                if (f16Value == null) {
+                    console.log("Cannot parse float16");
+                    return null;
+                }
+                res = f16Value[0];
+                pos += f16Value[1];
+                break;
+            }
+            case TypeName.F32: {
+                const f32Value = this.read_f(pos, buffer, Size.X32);
+                if (f32Value == null) {
+                    console.log("Cannot parse float32");
+                    return null;
+                }
+                res = f32Value[0];
+                pos += f32Value[1];
+                break;
+            }
+            case TypeName.F64: {
+                const f64Value = this.read_f(pos, buffer, Size.X64);
+                if (f64Value == null) {
+                    console.log("Cannot parse float64");
+                    return null;
+                }
+                res = f64Value[0];
+                pos += f64Value[1];
+                break;
+            }
+            case TypeName.Array: {
+                let arrayResult = this.read_array(ty.length, ty.item_type, pos, buffer);
+                if (arrayResult == null) {
+                    console.log("Cannot decode array");
+                    return null;
+                }
+                res = arrayResult[0];
+                pos += arrayResult[1];
+                break;
+            }
+            case TypeName.Vector: {
+                let lengthResult = this.read_u(Size.X64, pos, buffer);
+                if (lengthResult == null) {
+                    console.log("Cannot decode vector length");
+                    return null;
+                }
+                pos += lengthResult[1];
+                let arrayResult = this.read_array(lengthResult[0], ty.item_type, pos, buffer);
+                if (arrayResult == null) {
+                    console.log("Cannot decode vector");
+                    return null;
+                }
+                res = arrayResult[0];
+                pos += arrayResult[1];
+                break;
+            }
+            case TypeName.String: {
+                let stringResult = this.read_string(pos, buffer);
+                if (stringResult == null) {
+                    console.log("Cannot decode string");
+                    return null;
+                }
+                res = stringResult[0];
+                pos += stringResult[1];
+                break;
+            }
+            default: {
+                console.log("Unsupported for parsing");
+                return null;
+            }
+        }
+
+        return [res, pos - s_pos];
+    }
+
     public decode(pos: bigint, buffer: Uint8Array): [T, bigint] | null {
         let keys = Object.keys(this.types);
         let vals = Object.values(this.types);
@@ -23,75 +165,11 @@ export class Decoder<T> {
 
         vals.forEach((ty, index) => {
             let key = keys[index];
+            let ret = this.decode_type(ty, pos, buffer);
+            if (ret == null) { return null; }
 
-            switch (ty.type) {
-                case TypeName.Bool: {
-                    let bool = this.read_bool(pos, buffer);
-                    if (bool == null) {
-                        console.log("Cannot parse boolean");
-                        return null;
-                    }
-                    res[key] = bool[0] >= 1;
-                    pos += bool[1];
-                    break;
-                }
-                case TypeName.U: {
-                    let size = ty.size;
-                    let uValue = this.read_u(size, pos, buffer);
-                    if (uValue == null) {
-                        console.log("Cannot parse unsigned integer");
-                        return null;
-                    }
-                    res[key] = uValue[0];
-                    pos += uValue[1];
-                    break;
-                }
-                case TypeName.I: {
-                    let size = ty.size;
-                    let uValue = this.read_i(size, pos, buffer);
-                    if (uValue == null) {
-                        console.log("Cannot parse unsigned integer");
-                        return null;
-                    }
-                    res[key] = uValue[0];
-                    pos += uValue[1];
-                    break;
-                }
-                case TypeName.F16: {
-                    const f16Value = this.read_f(pos, buffer, Size.X16);
-                    if (f16Value == null) {
-                        console.log("Cannot parse float16");
-                        return null;
-                    }
-                    res[key] = f16Value[0];
-                    pos += f16Value[1];
-                    break;
-                }
-                case TypeName.F32: {
-                    const f32Value = this.read_f(pos, buffer, Size.X32);
-                    if (f32Value == null) {
-                        console.log("Cannot parse float32");
-                        return null;
-                    }
-                    res[key] = f32Value[0];
-                    pos += f32Value[1];
-                    break;
-                }
-                case TypeName.F64: {
-                    const f64Value = this.read_f(pos, buffer, Size.X64);
-                    if (f64Value == null) {
-                        console.log("Cannot parse float64");
-                        return null;
-                    }
-                    res[key] = f64Value[0];
-                    pos += f64Value[1];
-                    break;
-                }
-                default: {
-                    console.log("Unsupported for parsing");
-                    return null;
-                }
-            }
+            res[key] = ret[0];
+            pos += ret[1];
         });
 
         return [res as T, pos - s_pos];
@@ -152,7 +230,7 @@ export class Decoder<T> {
         return [value, len];
     }
 
-    private read_bytes(size: Size, pos: bigint, buffer: Uint8Array, signed: boolean): [bigint, bigint] | null {
+    private read_int_bytes(size: Size, pos: bigint, buffer: Uint8Array, signed: boolean): [bigint, bigint] | null {
         const bytePos = Number(pos);
         let result = BigInt(0);
         let len = BigInt(0);
@@ -206,10 +284,10 @@ export class Decoder<T> {
     }
 
     public read_u(size: Size, pos: bigint, buffer: Uint8Array): [bigint, bigint] | null {
-        return this.read_bytes(size, pos, buffer, false);
+        return this.read_int_bytes(size, pos, buffer, false);
     }
 
     public read_i(size: Size, pos: bigint, buffer: Uint8Array): [bigint, bigint] | null {
-        return this.read_bytes(size, pos, buffer, true);
+        return this.read_int_bytes(size, pos, buffer, true);
     }
 }

@@ -2,14 +2,36 @@ import {Decoder} from "../src/lib";
 import {Size} from "../src/type";
 
 let dec = new Decoder({
-    // aaa: "bool",
-    hello: "f32",
-    // var: "[u8; 2]"
+    hello: "string"
 });
 
-let buf = new Uint8Array(4);
-buf[0] = 0b11000011; // 0x00
-buf[1] = 0b11110101; // 0x00
-buf[2] = 0b01001000; // 0x00
-buf[3] = 0b01000000; // 0x3F
-console.log(dec.decode(0n, buf));
+let buf = new Uint8Array(10);
+buf[0] = 0x48;
+buf[1] = 0x69;
+buf[2] = 0;
+buf[3] = 0;
+buf[4] = 0;
+buf[5] = 0;
+buf[6] = 0;
+buf[7] = 0;
+buf[8] = 100;
+buf[9] = 200;
+print_o(dec.decode(0n, buf));
+
+function replaceBigInts(obj: any): any {
+    if (typeof obj === 'bigint') {
+        return Number(obj);
+    } else if (Array.isArray(obj)) {
+        return obj.map(item => replaceBigInts(item));
+    } else if (typeof obj === 'object' && obj !== null) {
+        return Object.fromEntries(
+            Object.entries(obj).map(([key, value]) => [key, replaceBigInts(value)])
+        );
+    } else {
+        return obj;
+    }
+}
+
+function print_o(obj: any) {
+    console.log(JSON.stringify(replaceBigInts(obj), null, 4));
+}
