@@ -1,7 +1,8 @@
-use binser_macros::make_answer;
+extern crate binser;
 
-make_answer!();
+use std::io::{Cursor, Seek, SeekFrom};
+use binser::encoding::Encoded;
 
 fn main() {
-    println!("Hello world {}", answer());
+
 }
