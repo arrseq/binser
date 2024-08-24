@@ -1,5 +1,19 @@
 export enum Size {X8, X16, X32, X64}
 
+export function key_size(obj: { [key: string]: any }): Size {
+    const keyCount = Object.keys(obj).length;
+
+    if (keyCount <= 0xFF) {
+        return Size.X8;
+    } else if (keyCount <= 0xFFFF) {
+        return Size.X16;
+    } else if (keyCount <= 0xFFFFFFFF) {
+        return Size.X32;
+    } else {
+        return Size.X64;
+    }
+}
+
 export enum TypeName {
     Bool,
 

@@ -1,4 +1,4 @@
-import {parse_type, Size, Type, TypeName} from "./type";
+import {key_size, parse_type, Size, Type, TypeName} from "./type";
 
 export * as ty from "./type";
 
@@ -149,10 +149,31 @@ export class Decoder<T> {
                 break;
             }
             case TypeName.Enum: {
-                let key = this.read_u(ty.key_size, pos, buffer);
+                let key = this.read_u(key_size(ty.items), pos, buffer);
                 if (key == null) { console.log("Cannot read enum key"); return null; }
+                pos += key[1];
 
+                let variant_key = key[0];
+                let variant_name = Object.keys(ty.items)[Number(variant_key)];
+                let variant_format = Object.values(ty.items)[Number(variant_key)];
+                let obj_out: any = {};
 
+                let fields = Object.values(variant_format);
+                let names = Object.keys(variant_format);
+
+                fields.forEach((field, index) => {
+                    let decoded = this.decode_type(field,  pos, buffer);
+                    if (decoded == null) { console.log("Invalid field, could not decode", names[index]); return null; }
+                    pos += decoded[1];
+
+                    obj_out[names[index]] = decoded[0];
+                });
+
+                let enum_body: any = {};
+                enum_body[variant_name] = obj_out;
+
+                res = enum_body;
+                break;
             }
             default: {
                 console.log("Unsupported for parsing");
