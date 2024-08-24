@@ -12,6 +12,7 @@ And more!
 This library has many flaws that will not be fixed. They do not cause problems if the tool is used correctly.
 - The parser is very basic, for example in many places you have to use a space after a comma `, `, `; `, and `: `.
 - The library does not have any good error handling. 
+- Extremely large numbers, arrays, enums and more can become misrepresented due to rounding from the javascript runtime. 
 
 # TypeScript usage
 ```ts
@@ -31,7 +32,7 @@ buf[1] = 105; // world[0] = 105
 buf[2] = 204; // world[1] = 204
 console.log(dec.decode(0n, buf)[0]);
 
-// Rust equivilant
+// Rust equivalent
 // struct Dec {
 //     hello: u8,
 //     world: [u8; 2]
