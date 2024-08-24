@@ -16,6 +16,8 @@ export enum TypeName {
     Vector
 }
 
+export type Variants = { [index: string]: KtpM };
+
 export interface BoolType { type: TypeName.Bool }
 export interface UintType { type: TypeName.U, size: Size }
 export interface IntType { type: TypeName.I, size: Size }
@@ -27,8 +29,7 @@ export interface FType {
 export interface StringType { type: TypeName.String }
 export interface Enum {
     type: TypeName.Enum,
-    key_size: Size,
-    items: Types[]
+    items: Variants
 }
 export interface ArrayType {
     type: TypeName.Array,
@@ -49,6 +50,8 @@ export type Type = BoolType
     | ArrayType
     | VectorType;
 export type Types = Type[];
+export type Ktp = [string, Type];
+export type KtpM = { [index: string]: Type };
 
 export function new_type(type: Type): Type { return type; }
 
@@ -67,24 +70,72 @@ export function parse_size(tstr: string): ParseResult<Size> | null {
     return null;
 }
 
-export function parse_object(o: string): ParseResult<Types> | null {
-    let l = 1;
-    o = o.substring(1);
+export function parse_ident(tstr: string): ParseResult<string> | null {
+    const regex = /^[a-zA-Z0-9_]+/;
+    const match = tstr.match(regex);
 
-    let type_out: Types = [];
+    if (!match) {
+        return null;
+    }
+
+    const value = match[0];
+    const length = value.length;
+
+    return { value, length };
+}
+
+export function parse_ktp(tstr: string): ParseResult<Ktp> | null {
+    let len = 0;
+    let ident = parse_ident(tstr);
+    if (ident == null) { console.log("Cannot parse object ident"); return null; }
+    tstr = tstr.substring(ident.length);
+    len += ident.length;
+
+    let cs = ": ";
+    if (tstr.startsWith(cs)) {
+        tstr = tstr.substring(cs.length);
+        len += cs.length;
+
+        let ty = parse_type(tstr);
+        if (ty == null) { console.log("Cannot parse KTP's type"); return null; }
+        len += ty.length;
+
+        return new_result({
+            value: [ident.value, ty.value],
+            length: len
+        });
+    }
+
+    return null;
+}
+
+export function parse_object(o: string): ParseResult<[string, KtpM]> | null {
+    let l = 0;
+
+    // read variant name.
+    let variant = parse_ident(o);
+    if (variant == null) { console.log("Invalid variant name", o); return null; }
+    l += variant.length;
+    o = o.substring(variant.length);
+
+    // skip opening bracket.
+    o = o.substring(1);
+    l += 1;
+
+    let type_out: KtpM = {};
 
     while (true) {
-        let ty = parse_type(o);
-        if (ty == null) { console.log("Invalid type", o); return null; }
-        l += ty.length;
-
-        type_out.push(ty.value);
-        o = o.substring(ty.length);
-
         if (o.startsWith("]")) {
             l += 1;
             break;
         }
+
+        let ktp = parse_ktp(o);
+        if (ktp == null) { console.log("Invalid ktp"); return null; }
+        l += ktp.length;
+
+        type_out[ktp.value[0]] = ktp.value[1];
+        o = o.substring(ktp.length);
 
         if (o.startsWith(", ")) {
             o = o.substring(2);
@@ -93,7 +144,7 @@ export function parse_object(o: string): ParseResult<Types> | null {
     }
 
     return new_result({
-        value: type_out,
+        value: [variant.value, type_out],
         length: l
     });
 }
@@ -159,11 +210,7 @@ export function parse_type(tstr: string): ParseResult<Type> | null {
         });
     }
 
-    // enum[si] ty
-    // [ty; le]
-    // [ty]
-
-    let enum_word = "enum[";
+    let enum_word = "enum ";
     let cs = ", ";
     let ss = "; ";
     let string = "string";
@@ -172,12 +219,7 @@ export function parse_type(tstr: string): ParseResult<Type> | null {
         tstr = tstr.substring(enum_word.length);
         len += enum_word.length;
 
-        let size = parse_size(tstr);
-        if (size == null) { return null; }
-        tstr = tstr.substring(size.length + 2); // remove closing bracket and space
-        len += size.length += 2;
-
-        let tys = [];
+        let tys: Variants = {};
 
         while (true) {
             let obj = parse_object(tstr);
@@ -185,8 +227,8 @@ export function parse_type(tstr: string): ParseResult<Type> | null {
             tstr = tstr.substring(obj.length);
             len += obj.length;
 
-            tys.push(obj.value);
-
+            let x_keyname = obj.value[0];
+            tys[x_keyname] = obj.value[1];
 
             // check for ", " to indicate next
             if (tstr.startsWith(cs)) {
@@ -196,7 +238,7 @@ export function parse_type(tstr: string): ParseResult<Type> | null {
         }
 
         return new_result({
-            value: new_type({ type: TypeName.Enum, key_size: size.value, items: tys }),
+            value: new_type({ type: TypeName.Enum, items: tys }),
             length: len
         });
     } else if (tstr.startsWith("[") && tstr.endsWith("]")) {

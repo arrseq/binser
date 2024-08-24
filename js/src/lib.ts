@@ -148,6 +148,12 @@ export class Decoder<T> {
                 pos += stringResult[1];
                 break;
             }
+            case TypeName.Enum: {
+                let key = this.read_u(ty.key_size, pos, buffer);
+                if (key == null) { console.log("Cannot read enum key"); return null; }
+
+
+            }
             default: {
                 console.log("Unsupported for parsing");
                 return null;
