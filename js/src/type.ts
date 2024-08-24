@@ -1,7 +1,5 @@
 export enum Size {X8, X16, X32, X64}
 
-export type  U64 = [number, number];
-
 export enum TypeName {
     Bool,
 
@@ -35,7 +33,7 @@ export interface Enum {
 export interface ArrayType {
     type: TypeName.Array,
     item_type: Type,
-    length: U64
+    length: bigint
 }
 export interface VectorType {
     type: TypeName.Vector,
@@ -100,6 +98,20 @@ export function parse_object(o: string): ParseResult<Types> | null {
     });
 }
 
+export function parse_num(tstr: string): ParseResult<bigint> | null {
+    let index = 0;
+    while (index < tstr.length && /\d/.test(tstr[index])) {
+        index++;
+    }
+
+    if (index === 0) {
+        return null;
+    }
+
+    const num = BigInt(tstr.slice(0, index));
+    return { value: num, length: index };
+}
+
 export function parse_type(tstr: string): ParseResult<Type> | null {
     let len = 0;
     if (tstr.startsWith("bool")) { return new_result({
@@ -152,6 +164,8 @@ export function parse_type(tstr: string): ParseResult<Type> | null {
     // [ty]
 
     let enum_word = "enum[";
+    let cs = ", ";
+    let ss = "; ";
 
     if (tstr.startsWith(enum_word)) {
         tstr = tstr.substring(enum_word.length);
@@ -174,7 +188,6 @@ export function parse_type(tstr: string): ParseResult<Type> | null {
 
 
             // check for ", " to indicate next
-            let cs = ", ";
             if (tstr.startsWith(cs)) {
                 tstr = tstr.substring(cs.length);
                 len += cs.length;
@@ -186,7 +199,46 @@ export function parse_type(tstr: string): ParseResult<Type> | null {
             length: len
         });
     } else if (tstr.startsWith("[") && tstr.endsWith("]")) {
+        tstr = tstr.substring(1);
+        len += 1;
 
+        let ty = parse_type(tstr);
+        if (ty == null) { console.log("Failed to parse type"); return null; }
+        tstr = tstr.substring(ty.length);
+        len += ty.length;
+
+        if (tstr.startsWith(ss)) {
+            tstr = tstr.substring(ss.length);
+            len += ss.length;
+
+            let array_len = parse_num(tstr);
+            if (array_len == null) { console.log("Cannot parse array length, but found length sequence"); return null; }
+            len += array_len.length;
+            tstr = tstr.substring(array_len.length);
+
+            if (tstr.startsWith("]")) { len += 1; }
+            else { console.log("Missing closing bracket for array/vector"); return null; }
+
+            return new_result({
+                value: new_type({
+                    type: TypeName.Array,
+                    item_type: ty.value,
+                    length: array_len.value
+                }),
+                length: len
+            });
+        }
+
+        if (tstr.startsWith("]")) { len += 1; }
+        else { console.log("Missing closing bracket for array/vector"); return null; }
+
+        return new_result({
+            value: new_type({
+                type: TypeName.Vector,
+                item_type: ty.value
+            }),
+            length: len
+        })
     }
 
     return null;
