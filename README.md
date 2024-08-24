@@ -15,7 +15,12 @@ This library has many flaws that will not be fixed. They do not cause problems i
 
 # TypeScript usage
 ```ts
-let dec = new Decoder({
+interface Struct {
+    hello: number,
+    world: [number, number]
+}
+
+let dec = new Decoder<Struct>({
     hello: "u8",
     world: "[u8; 2]"
 });
