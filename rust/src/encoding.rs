@@ -1,26 +1,21 @@
 use std::io;
 
-pub enum Type {
-    Bool,
-    U8, U16, U32, U64,
-    I8, I16, I32, I64,
-    Array, Vector, String
+pub trait Encoded {
+    fn encode(&self, output: &mut impl io::Write) -> io::Result<()>;
 }
 
-pub trait Encoded: Sized {
-    const TYPE: Type;
-    fn encode(&self, output: &mut impl io::Write) -> io::Result<()>;
+pub trait Decoded: Sized {
     fn decode(input: &mut impl io::Read) -> io::Result<Self>;
 }
 
 impl Encoded for bool {
-    const TYPE: Type = Type::Bool;
-
     fn encode(&self, output: &mut impl io::Write) -> io::Result<()> {
         let byte = if *self { 1 } else { 0 };
         output.write_all(&[byte])
     }
+}
 
+impl Decoded for bool {
     fn decode(input: &mut impl io::Read) -> io::Result<Self> {
         let mut byte = [0];
         input.read_exact(&mut byte)?;
@@ -29,15 +24,15 @@ impl Encoded for bool {
 }
 
 macro_rules! implement_int_trait {
-    ($int:ident, $type:expr) => {
+    ($int:ident) => {
         impl Encoded for $int {
-            const TYPE: Type = $type;
-
             fn encode(&self, output: &mut impl io::Write) -> io::Result<()> {
                 let bytes = self.to_le_bytes();
                 output.write_all(&bytes)
             }
-
+        }
+        
+        impl Decoded for $int {
             fn decode(input: &mut impl io::Read) -> io::Result<Self> {
                 let mut bytes = [0; std::mem::size_of::<$int>()];
                 input.read_exact(&mut bytes)?;
@@ -47,23 +42,23 @@ macro_rules! implement_int_trait {
     };
 }
 
-implement_int_trait!(u8, Type::U8);
-implement_int_trait!(u16, Type::U16);
-implement_int_trait!(u32, Type::U32);
-implement_int_trait!(u64, Type::U64);
-implement_int_trait!(i8, Type::I8);
-implement_int_trait!(i16, Type::I16);
-implement_int_trait!(i32, Type::I32);
-implement_int_trait!(i64, Type::I64);
+implement_int_trait!(u8);
+implement_int_trait!(u16);
+implement_int_trait!(u32);
+implement_int_trait!(u64);
+implement_int_trait!(i8);
+implement_int_trait!(i16);
+implement_int_trait!(i32);
+implement_int_trait!(i64);
 
 impl<T: Encoded, const N: usize> Encoded for [T; N] {
-    const TYPE: Type = Type::Array;
-
     fn encode(&self, output: &mut impl io::Write) -> io::Result<()> {
         for item in self.iter() { item.encode(output)?; }
         Ok(())
     }
+}
 
+impl<T: Decoded, const N: usize> Decoded for [T; N] {
     fn decode(input: &mut impl io::Read) -> io::Result<Self> {
         let mut array: [T; N] = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
         for item in &mut array { *item = T::decode(input)?; }
@@ -72,8 +67,6 @@ impl<T: Encoded, const N: usize> Encoded for [T; N] {
 }
 
 impl<T: Encoded> Encoded for Vec<T> {
-    const TYPE: Type = Type::Vector;
-
     fn encode(&self, output: &mut impl io::Write) -> io::Result<()> {
         let length = self.len() as u64;
         output.write_all(&length.to_le_bytes())?;
@@ -84,7 +77,9 @@ impl<T: Encoded> Encoded for Vec<T> {
 
         Ok(())
     }
+}
 
+impl<T: Decoded> Decoded for Vec<T> {
     fn decode(input: &mut impl io::Read) -> io::Result<Self> {
         let mut length_bytes = [0u8; 8];
         input.read_exact(&mut length_bytes)?;
@@ -102,8 +97,6 @@ impl<T: Encoded> Encoded for Vec<T> {
 }
 
 impl Encoded for String {
-    const TYPE: Type = Type::String;
-
     fn encode(&self, output: &mut impl io::Write) -> io::Result<()> {
         let bytes = self.as_bytes();
         let length = bytes.len() as u64;
@@ -113,7 +106,9 @@ impl Encoded for String {
 
         Ok(())
     }
+}
 
+impl Decoded for String {
     fn decode(input: &mut impl io::Read) -> io::Result<Self> {
         let mut length_bytes = [0u8; 8];
         input.read_exact(&mut length_bytes)?;

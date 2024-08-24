@@ -1,17 +1,14 @@
 import {Decoder} from "../src/lib";
 
-interface Struct {
-    hello: number,
-    world: [number, number]
-}
-
-let dec = new Decoder<Struct>({
-    hello: "u8",
-    world: "[u8; 2]"
+let dec = new Decoder({
+    e: "enum A[virtual: bool, b: u8], B[]",
+    som: "u8"
 });
 
-let buf = new Uint8Array(3);
-buf[0] = 10;  // hello = 10
-buf[1] = 105; // world[0] = 105
-buf[2] = 204; // world[1] = 204
-console.log(dec.decode(0n, buf)[0]);
+let buffer = new Uint8Array([0, 1, 50, 50]);
+console.log(dec.encode({
+    e: {
+        "A": { virtual: true, b: 10 }
+    },
+    som: 50
+}));

@@ -2,6 +2,30 @@ import {key_size, parse_type, Size, Type, TypeName} from "./type";
 
 export * as ty from "./type";
 
+export enum ResultType {
+    Ok, Err
+}
+
+export interface OkResult<T> {
+    type: ResultType.Ok,
+    value: T
+}
+
+export interface ErrResult<E> {
+    type: ResultType.Err,
+    error: E
+}
+
+export type Result<T, E> = OkResult<T> | ErrResult<E>;
+
+export function ok<T, E>(value: T): Result<T, E> {
+    return { type: ResultType.Ok, value };
+}
+
+export function err<T, E>(error: E): Result<T, E> {
+    return { type: ResultType.Err, error };
+}
+
 export class Decoder<T> {
     public types: { [index: string]: Type } = {};
 
@@ -316,5 +340,197 @@ export class Decoder<T> {
 
     public read_i(size: Size, pos: bigint, buffer: Uint8Array): [bigint, bigint] | null {
         return this.read_int_bytes(size, pos, buffer, true);
+    }
+
+    private encode_array(array: any[], itemType: Type): Uint8Array | null {
+        let bufferArray: Uint8Array[] = [];
+
+        for (let element of array) {
+            let encoded = this.encode_type(itemType, element);
+            if (encoded == null) return null;
+            bufferArray.push(encoded);
+        }
+
+        return this.concat_buffers(bufferArray);
+    }
+
+    private encode_string(str: string): Uint8Array {
+        const encoder = new TextEncoder();
+        let encodedString = encoder.encode(str);
+        return new Uint8Array([...encodedString, 0x00]);
+    }
+
+    public encode_type(ty: Type, value: any): Uint8Array | null {
+        switch (ty.type) {
+            case TypeName.Bool: {
+                return this.encode_bool(value);
+            }
+            case TypeName.U: {
+                return this.encode_u(ty.size, BigInt(value));
+            }
+            case TypeName.I: {
+                return this.encode_i(ty.size, BigInt(value));
+            }
+            case TypeName.F16: {
+                return this.encode_f(value, Size.X16);
+            }
+            case TypeName.F32: {
+                return this.encode_f(value, Size.X32);
+            }
+            case TypeName.F64: {
+                return this.encode_f(value, Size.X64);
+            }
+            case TypeName.Array: {
+                return this.encode_array(value, ty.item_type);
+            }
+            case TypeName.Vector: {
+                let lengthEncoded = this.encode_u(Size.X64, BigInt(value.length));
+                let arrayEncoded = this.encode_array(value, ty.item_type);
+                if (arrayEncoded == null) return null;
+                return this.concat_buffers([lengthEncoded, arrayEncoded]);
+            }
+            case TypeName.String: {
+                return this.encode_string(value);
+            }
+            case TypeName.Enum: {
+                let variantName = Object.keys(value)[0];
+                let variantFormat = ty.items[variantName];
+                let variantKey = BigInt(Object.keys(ty.items).indexOf(variantName));
+                let keyEncoded = this.encode_u(key_size(ty.items), variantKey);
+
+                let fieldBuffers: Uint8Array[] = [];
+                for (let [fieldName, fieldType] of Object.entries(variantFormat)) {
+                    let fieldValue = value[variantName][fieldName];
+                    let fieldEncoded = this.encode_type(fieldType, fieldValue);
+                    if (fieldEncoded == null) return null;
+                    fieldBuffers.push(fieldEncoded);
+                }
+
+                return this.concat_buffers([keyEncoded, ...fieldBuffers]);
+            }
+            default: {
+                console.log("Unsupported for encoding");
+                return null;
+            }
+        }
+    }
+
+    public encode(value: T): Uint8Array | null {
+        let bufferArray: Uint8Array[] = [];
+        let keys = Object.keys(this.types);
+        let vals = Object.values(this.types);
+
+        for (let i = 0; i < keys.length; i++) {
+            let key = keys[i];
+            let ty = vals[i];
+            let fieldValue = (value as any)[key];
+
+            let encodedField = this.encode_type(ty, fieldValue);
+            if (encodedField == null) return null;
+
+            bufferArray.push(encodedField);
+        }
+
+        return this.concat_buffers(bufferArray);
+    }
+
+    private encode_bool(value: boolean): Uint8Array {
+        return new Uint8Array([value ? 1 : 0]);
+    }
+
+    private encode_u(size: Size, value: bigint): Uint8Array | null {
+        return this.encode_int_bytes(size, value, false);
+    }
+
+    private encode_i(size: Size, value: bigint): Uint8Array | null {
+        return this.encode_int_bytes(size, value, true);
+    }
+
+    private encode_f(value: number, size: Size): Uint8Array | null {
+        let buffer = new ArrayBuffer(size === Size.X16 ? 2 : size === Size.X32 ? 4 : 8);
+        let view = new DataView(buffer);
+
+        if (size === Size.X16) {
+            this.write_f16(view, 0, value);
+        } else if (size === Size.X32) {
+            view.setFloat32(0, value, true);
+        } else if (size === Size.X64) {
+            view.setFloat64(0, value, true);
+        }
+
+        return new Uint8Array(buffer);
+    }
+
+    private encode_int_bytes(size: Size, value: bigint, signed: boolean): Uint8Array | null {
+        let buffer = new ArrayBuffer(size === Size.X8 ? 1 : size === Size.X16 ? 2 : size === Size.X32 ? 4 : 8);
+        let view = new DataView(buffer);
+
+        if (signed) {
+            switch (size) {
+                case Size.X8:
+                    view.setInt8(0, Number(value));
+                    break;
+                case Size.X16:
+                    view.setInt16(0, Number(value), true);
+                    break;
+                case Size.X32:
+                    view.setInt32(0, Number(value), true);
+                    break;
+                case Size.X64:
+                    view.setBigInt64(0, value, true);
+                    break;
+            }
+        } else {
+            switch (size) {
+                case Size.X8:
+                    view.setUint8(0, Number(value));
+                    break;
+                case Size.X16:
+                    view.setUint16(0, Number(value), true);
+                    break;
+                case Size.X32:
+                    view.setUint32(0, Number(value), true);
+                    break;
+                case Size.X64:
+                    view.setBigUint64(0, value, true);
+                    break;
+            }
+        }
+
+        return new Uint8Array(buffer);
+    }
+
+    private concat_buffers(buffers: Uint8Array[]): Uint8Array {
+        let totalLength = buffers.reduce((acc, buffer) => acc + buffer.length, 0);
+        let result = new Uint8Array(totalLength);
+
+        let offset = 0;
+        buffers.forEach(buffer => {
+            result.set(buffer, offset);
+            offset += buffer.length;
+        });
+
+        return result;
+    }
+
+    private write_f16(view: DataView, byteOffset: number, value: number): void {
+        let floatView = new DataView(new ArrayBuffer(4));
+        floatView.setFloat32(0, value, true);
+
+        const bits = floatView.getUint32(0);
+        const sign = (bits >> 16) & 0x8000;
+        const exp = (bits >> 23) & 0xff;
+        const fraction = bits & 0x7fffff;
+
+        let h;
+        if (exp === 0) {
+            h = (sign | (fraction >> 13));
+        } else if (exp === 0xff) {
+            h = (sign | 0x7c00 | (fraction ? 1 : 0));
+        } else {
+            h = (sign | ((exp - 112) << 10) | (fraction >> 13));
+        }
+
+        view.setUint16(byteOffset, h, true);
     }
 }
