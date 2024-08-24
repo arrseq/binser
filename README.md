@@ -1,6 +1,13 @@
 # Binary Serializer
 A tool used to encode and decode complex binary structures.
 
+This library can be useful in a variety of situations:
+- When sending complex structured data between a server and client.
+- When sending complex structured data between 2 different processes in a different programming language.
+- To store complex structures in a file
+
+And more!
+
 # Warning
 This library has many flaws that will not be fixed. They do not cause problems if the tool is used correctly.
 - The parser is very basic, for example in many places you have to use a space after a comma `, `, `; `, and `: `.
