@@ -2,21 +2,15 @@ import {Decoder} from "../src/lib";
 import {parse_ktp, parse_object, parse_type, Size} from "../src/type";
 
 let dec = new Decoder({
-    hello: "enum A[a: bool, c: u8], B[]"
+    hello: "u8",
+    world: "[u8; 2]"
 });
 
-let buf = new Uint8Array(10);
-buf[0] = 0; // variant A
-buf[1] = 1; // a = true
-buf[2] = 0;
-buf[3] = 0;
-buf[4] = 0;
-buf[5] = 0;
-buf[6] = 0;
-buf[7] = 0;
-buf[8] = 0;
-buf[9] = 0;
-print_o(dec.decode(0n, buf));
+let buf = new Uint8Array(3);
+buf[0] = 10; // hello = 10
+buf[1] = 105; // world[0] = 105
+buf[2] = 204; // world[1] = 204
+console.log(dec.decode(0n, buf)[0]);
 
 function replaceBigInts(obj: any): any {
     if (typeof obj === 'bigint') {
