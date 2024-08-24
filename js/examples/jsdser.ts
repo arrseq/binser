@@ -1,19 +1,15 @@
-// import {Decoder} from "../src/lib";
+import {Decoder} from "../src/lib";
+import {Size} from "../src/type";
 
-// let dec = new Decoder({
-//     aaa: "u8",
-//     hello: "@!21u821;@!@!4]",
-//     var: "[u64]"
-// });
-//
-// // aaa = 10
-// // hello = 3 4 16 0
-// // var = 2 elems, 1 and 0
-// dec.decode_arr([ 0b00001010, 0b00000011, 0b00000100, 0b00001111, 0b00000000, 0b00000010, 0b00000001, 0b00000000 ]);
+let dec = new Decoder({
+    // aaa: "bool",
+    hello: "f32",
+    // var: "[u8; 2]"
+});
 
-import {parse_num, parse_object, parse_type} from "../src/type";
-
-// let enm = parse_type("[u8; 10]")!.value as any;
-// console.log(enm.items);
-
-console.log(parse_type("[u8]"));
+let buf = new Uint8Array(4);
+buf[0] = 0b11000011; // 0x00
+buf[1] = 0b11110101; // 0x00
+buf[2] = 0b01001000; // 0x00
+buf[3] = 0b01000000; // 0x3F
+console.log(dec.decode(0n, buf));
