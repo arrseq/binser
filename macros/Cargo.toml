@@ -1,5 +1,5 @@
 [package]
-name = "binser-macros"
+name = "xbinser-macros"
 version = "0.1.0"
 edition = "2021"
 
