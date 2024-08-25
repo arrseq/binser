@@ -27,7 +27,7 @@ pub fn struct_encoded(input: TokenStream) -> TokenStream {
     }
 
     let expanded = quote! {
-        impl ::binser::encoding::Encoded for #name {
+        impl ::xbinser::encoding::Encoded for #name {
             fn encode(&self, output: &mut impl ::std::io::Write) -> ::std::io::Result<()> {
                 #(#encode_fields)*
                 Ok(())
@@ -54,7 +54,7 @@ pub fn struct_decoded(input: TokenStream) -> TokenStream {
 
     for field in fields {
         let field_name = &field.ident;
-        let encoded_type = quote! { ::binser::encoding::Decoded };
+        let encoded_type = quote! { ::xbinser::encoding::Decoded };
         
         decode_fields.push(quote! {
             let #field_name = #encoded_type::decode(input)?;
@@ -64,7 +64,7 @@ pub fn struct_decoded(input: TokenStream) -> TokenStream {
     }
 
     let expanded = quote! {
-        impl ::binser::encoding::Decoded for #name {
+        impl ::xbinser::encoding::Decoded for #name {
             fn decode(input: &mut impl ::std::io::Read) -> ::std::io::Result<Self> {
                 #(#decode_fields)*
                 Ok(#name {
@@ -116,7 +116,7 @@ pub fn enum_encoded(input: TokenStream) -> TokenStream {
             for field in &fields.named {
                 let field_name = &field.ident;
                 encode_calls.push(quote! { 
-                    ::binser::encoding::Encoded::encode(#field_name, output);
+                    ::xbinser::encoding::Encoded::encode(#field_name, output);
                 });
             }
 
@@ -138,7 +138,7 @@ pub fn enum_encoded(input: TokenStream) -> TokenStream {
     }
 
     let expanded = quote! {
-        impl ::binser::encoding::Encoded for #name {
+        impl ::xbinser::encoding::Encoded for #name {
             fn encode(&self, output: &mut impl ::std::io::Write) -> ::std::io::Result<()> {
                 match self {
                     #(#encode_variants)*
@@ -189,7 +189,7 @@ pub fn enum_decoded(input: TokenStream) -> TokenStream {
 
             let decode_fields = field_names.iter().zip(field_types.iter()).map(|(field_name, field_type)| {
                 quote! {
-                    let #field_name: #field_type = ::binser::encoding::Decoded::decode(input)?;
+                    let #field_name: #field_type = ::xbinser::encoding::Decoded::decode(input)?;
                 }
             });
 
@@ -209,7 +209,7 @@ pub fn enum_decoded(input: TokenStream) -> TokenStream {
     }
 
     let expanded = quote! {
-        impl ::binser::encoding::Decoded for #name {
+        impl ::xbinser::encoding::Decoded for #name {
             fn decode(input: &mut impl ::std::io::Read) -> ::std::io::Result<Self> {
                 let mut code_bytes = vec![0u8; std::mem::size_of::<#variant_code_type>()];
                 input.read_exact(&mut code_bytes)?;
