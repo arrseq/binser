@@ -21,6 +21,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "rust-examples"
+version = "0.1.0"
+dependencies = [
+ "xbinser",
+ "xbinser-macros",
+]
+
+[[package]]
 name = "syn"
 version = "2.0.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"

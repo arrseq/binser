@@ -1,29 +1,22 @@
-extern crate binser;
-extern crate binser_macros;
+extern crate xbinser;
+extern crate xbinser_macros;
 
-use std::io::Cursor;
-use binser::encoding::{Decoded, Encoded};
-use binser_macros::{EnumDecoded, EnumEncoded, StructDecoded, StructEncoded};
+use std::io::{Cursor, Seek};
+use xbinser::encoding::{Decoded, Encoded};
+use xbinser_macros::{EnumDecoded, EnumEncoded, StructDecoded, StructEncoded};
 
-#[derive(Debug, EnumDecoded)]
-enum En {
-    A { r#virtual: bool, b: u8 }, B
-}
 
-#[derive(Debug, StructDecoded)]
-struct TestStruct {
-    e: En,
-    som: u8
+#[derive(Debug, StructEncoded, StructDecoded, PartialEq)]
+struct TextContainer {
+    text: String
 }
 
 fn main() {
-    let s = TestStruct {
-        e: En::A { r#virtual: true, b: 50 },
-        som: 50
-    };
+    let mut cursor = Cursor::new(vec![]);
+    TextContainer { text: String::from("Hello World") }.encode(&mut cursor).unwrap();
 
-    let mut out = Cursor::new(vec![0, 1, 15, 23]);
-    dbg!(TestStruct::decode(&mut out));
-
-    // dbg!(out.get_ref());
+    assert_eq!(&vec![0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x57, 0x6F, 0x72, 0x6C, 0x64], cursor.get_ref());
+    
+    cursor.set_position(0);
+    assert_eq!(TextContainer { text: String::from("Hello World") }, TextContainer::decode(&mut cursor).unwrap());
 }

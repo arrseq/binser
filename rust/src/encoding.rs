@@ -99,26 +99,17 @@ impl<T: Decoded> Decoded for Vec<T> {
 impl Encoded for String {
     fn encode(&self, output: &mut impl io::Write) -> io::Result<()> {
         let bytes = self.as_bytes();
-        let length = bytes.len() as u64;
-
-        output.write_all(&length.to_le_bytes())?;
         output.write_all(bytes)?;
-
         Ok(())
     }
 }
 
 impl Decoded for String {
     fn decode(input: &mut impl io::Read) -> io::Result<Self> {
-        let mut length_bytes = [0u8; 8];
-        input.read_exact(&mut length_bytes)?;
+        let mut bytes = Vec::new();
+        input.read_to_end(&mut bytes)?;
 
-        let length = u64::from_le_bytes(length_bytes) as usize;
-
-        let mut string_bytes = vec![0u8; length];
-        input.read_exact(&mut string_bytes)?;
-
-        let decoded_string = String::from_utf8(string_bytes)
+        let decoded_string = String::from_utf8(bytes)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
         Ok(decoded_string)

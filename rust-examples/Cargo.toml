@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-binser = { path="../rust" }
-binser-macros = { path="../macros" }
+xbinser = { path="../rust" }
+xbinser-macros = { path="../macros" }

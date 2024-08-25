@@ -1,2 +1,2 @@
 [workspace]
-members = [ "macros", "rust" ]
+members = [ "macros", "rust", "rust-examples" ]
