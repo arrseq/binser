@@ -54,7 +54,7 @@ pub fn struct_decoded(input: TokenStream) -> TokenStream {
 
     for field in fields {
         let field_name = &field.ident;
-        let encoded_type = quote! { ::binser::encoding::Encoded };
+        let encoded_type = quote! { ::binser::encoding::Decoded };
         
         decode_fields.push(quote! {
             let #field_name = #encoded_type::decode(input)?;
@@ -64,7 +64,7 @@ pub fn struct_decoded(input: TokenStream) -> TokenStream {
     }
 
     let expanded = quote! {
-        impl ::binser::encoding::Encoded for #name {
+        impl ::binser::encoding::Decoded for #name {
             fn decode(input: &mut impl ::std::io::Read) -> ::std::io::Result<Self> {
                 #(#decode_fields)*
                 Ok(#name {
@@ -89,7 +89,6 @@ pub fn enum_encoded(input: TokenStream) -> TokenStream {
     let variants = &data.variants;
     let num_variants = variants.len();
 
-    // Determine the smallest integer type for variant codes
     let variant_code_type = match num_variants {
         0..=255 => quote! { u8 },
         256..=65535 => quote! { u16 },
@@ -101,7 +100,7 @@ pub fn enum_encoded(input: TokenStream) -> TokenStream {
 
     for (index, variant) in variants.iter().enumerate() {
         let variant_name = &variant.ident;
-        let variant_code = index as u64; // Code for the variant
+        let variant_code = index as u64; 
         let variant_code_literal = match variant_code_type.to_string().as_str() {
             "u8" => quote! { #variant_code as u8 },
             "u16" => quote! { #variant_code as u16 },
@@ -164,7 +163,6 @@ pub fn enum_decoded(input: TokenStream) -> TokenStream {
     let variants = &data.variants;
     let num_variants = variants.len();
 
-    // Determine the smallest integer type for variant codes
     let variant_code_type = match num_variants {
         0..=255 => quote! { u8 },
         256..=65535 => quote! { u16 },
@@ -176,35 +174,36 @@ pub fn enum_decoded(input: TokenStream) -> TokenStream {
 
     for (index, variant) in variants.iter().enumerate() {
         let variant_name = &variant.ident;
-        let variant_code = index as u64; // Code for the variant
+        let variant_code = index as u64; 
         let variant_code_literal = match variant_code_type.to_string().as_str() {
-            "u8" => quote! { #variant_code as u8 },
-            "u16" => quote! { #variant_code as u16 },
-            "u32" => quote! { #variant_code as u32 },
+            "u8" => quote! { #variant_code },
+            "u16" => quote! { #variant_code },
+            "u32" => quote! { #variant_code },
             "u64" => quote! { #variant_code },
             _ => quote! { #variant_code },
         };
 
         if let Fields::Named(fields) = &variant.fields {
-            let mut decode_fields = Vec::new();
+            let field_names: Vec<_> = fields.named.iter().map(|f| &f.ident).collect();
             let field_types: Vec<_> = fields.named.iter().map(|f| &f.ty).collect();
 
-            for field_type in field_types {
-                decode_fields.push(quote! {
-                    let field_value = <#field_type as ::binser::encoding::Decoded>::decode(input)?;
-                });
-            }
+            let decode_fields = field_names.iter().zip(field_types.iter()).map(|(field_name, field_type)| {
+                quote! {
+                    let #field_name: #field_type = ::binser::encoding::Decoded::decode(input)?;
+                }
+            });
 
             decode_variants.push(quote! {
-                #variant_code_literal => Ok(#name::#variant_name {
+                #variant_code_literal => {
                     #(
                         #decode_fields
                     )*
-                })
+                    Ok(#name::#variant_name { #(#field_names),* })
+                }
             });
         } else {
             decode_variants.push(quote! {
-                #variant_code_literal => Ok(#name::#variant_name),
+                #variant_code_literal => { Ok(Self::#variant_name) }
             });
         }
     }
@@ -212,12 +211,12 @@ pub fn enum_decoded(input: TokenStream) -> TokenStream {
     let expanded = quote! {
         impl ::binser::encoding::Decoded for #name {
             fn decode(input: &mut impl ::std::io::Read) -> ::std::io::Result<Self> {
-                let mut variant_code_buf = [0; std::mem::size_of::<#variant_code_type>()];
-                input.read_exact(&mut variant_code_buf)?;
-                let variant_code = #variant_code_type::from_le_bytes(variant_code_buf);
-                
-                match variant_code {
-                    #(#decode_variants)*
+                let mut code_bytes = vec![0u8; std::mem::size_of::<#variant_code_type>()];
+                input.read_exact(&mut code_bytes)?;
+                let code = #variant_code_type::from_le_bytes(code_bytes.try_into().unwrap());
+
+                match code as u64 {
+                    #(#decode_variants,)*
                     _ => Err(::std::io::Error::new(::std::io::ErrorKind::InvalidData, "Unknown variant code")),
                 }
             }
