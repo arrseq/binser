@@ -48,11 +48,13 @@ export interface Enum {
 export interface ArrayType {
     type: TypeName.Array,
     item_type: Type,
-    length: bigint
+    length: bigint,
+    buffered: boolean
 }
 export interface VectorType {
     type: TypeName.Vector,
-    item_type: Type
+    item_type: Type,
+    buffered: boolean
 }
 
 export type Type = BoolType
@@ -63,7 +65,6 @@ export type Type = BoolType
     | Enum
     | ArrayType
     | VectorType;
-export type Types = Type[];
 export type Ktp = [string, Type];
 export type KtpM = { [index: string]: Type };
 
@@ -83,6 +84,18 @@ export function parse_size(tstr: string): ParseResult<Size> | null {
     if (tstr.startsWith("64")) { return { value: Size.X64, length: 2 }; }
     return null;
 }
+
+export function parse_buffered(tstr: string): ParseResult<void> | null {
+    if (!tstr.startsWith("x:")) {
+        return null;
+    }
+
+    return new_result({
+        value: null,
+        length: 2
+    });
+}
+
 
 export function parse_ident(tstr: string): ParseResult<string> | null {
     const regex = /^[a-zA-Z0-9_]+/;
@@ -255,18 +268,36 @@ export function parse_type(tstr: string): ParseResult<Type> | null {
             value: new_type({ type: TypeName.Enum, items: tys }),
             length: len
         });
-    } else if (tstr.startsWith("[") && tstr.endsWith("]")) {
+    }
+
+    if (tstr.startsWith("[") /* && tstr.endsWith("]") */) {
         tstr = tstr.substring(1);
         len += 1;
 
+        let buffered_result = parse_buffered(tstr);
+        let buffered = false;
+        if (buffered_result != null) {
+            buffered = true;
+            tstr = tstr.substring(buffered_result.length);
+            len += buffered_result.length;
+        }
+
         let ty = parse_type(tstr);
-        if (ty == null) { console.log("Failed to parse type"); return null; }
+        if (ty == null) { console.log("Failed to parse type, null type error", tstr); return null; }
         tstr = tstr.substring(ty.length);
         len += ty.length;
 
         if (tstr.startsWith(ss)) {
             tstr = tstr.substring(ss.length);
             len += ss.length;
+
+            let buffered_result = parse_buffered(tstr);
+            let buffered = false;
+            if (buffered_result != null) {
+                buffered = true;
+                tstr = tstr.substring(buffered_result.length);
+                len += buffered_result.length;
+            }
 
             let array_len = parse_num(tstr);
             if (array_len == null) { console.log("Cannot parse array length, but found length sequence"); return null; }
@@ -280,7 +311,8 @@ export function parse_type(tstr: string): ParseResult<Type> | null {
                 value: new_type({
                     type: TypeName.Array,
                     item_type: ty.value,
-                    length: array_len.value
+                    length: array_len.value,
+                    buffered
                 }),
                 length: len
             });
@@ -292,7 +324,8 @@ export function parse_type(tstr: string): ParseResult<Type> | null {
         return new_result({
             value: new_type({
                 type: TypeName.Vector,
-                item_type: ty.value
+                item_type: ty.value,
+                buffered
             }),
             length: len
         })

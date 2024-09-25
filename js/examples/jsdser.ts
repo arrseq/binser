@@ -1,14 +1,12 @@
 import {Decoder} from "../src/lib";
 
 let dec = new Decoder({
-    e: "enum A[virtual: bool, b: u8], B[]",
-    som: "u8"
+    e: "[u8; x:10]"
 });
 
-let buffer = new Uint8Array([0, 1, 50, 50]);
-console.log(dec.encode({
-    e: {
-        "A": { virtual: true, b: 10 }
-    },
-    som: 50
-}));
+let buffer = new Uint8Array([
+    3, 0, 0, 0, 0, 0, 0, 0, // length = 1
+    0, 255, 127             // data = [0, 255, 127]
+]);
+
+console.log(dec.decode(0n, buffer));
