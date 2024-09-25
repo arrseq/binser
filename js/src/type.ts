@@ -190,6 +190,26 @@ export function parse_num(tstr: string): ParseResult<bigint> | null {
     return { value: num, length: index };
 }
 
+function can_buffer(type: TypeName): boolean {
+    let can = false;
+    switch (type) {
+        case TypeName.Enum:
+        case TypeName.Array:
+        case TypeName.Vector:
+        case TypeName.String:
+        case TypeName.Bool:
+            break;
+        case TypeName.U:
+        case TypeName.I:
+        case TypeName.F16:
+        case TypeName.F32:
+        case TypeName.F64:
+            can = true;
+            break;
+    }
+    return can;
+}
+
 export function parse_type(tstr: string): ParseResult<Type> | null {
     let len = 0;
     if (tstr.startsWith("bool")) { return new_result({
@@ -307,6 +327,8 @@ export function parse_type(tstr: string): ParseResult<Type> | null {
             if (tstr.startsWith("]")) { len += 1; }
             else { console.log("Missing closing bracket for array/vector"); return null; }
 
+            if (buffered && !can_buffer(ty.value.type)) { console.log("Cannot buffer a complex type"); return null; }
+
             return new_result({
                 value: new_type({
                     type: TypeName.Array,
@@ -320,6 +342,8 @@ export function parse_type(tstr: string): ParseResult<Type> | null {
 
         if (tstr.startsWith("]")) { len += 1; }
         else { console.log("Missing closing bracket for array/vector"); return null; }
+
+        if (buffered && !can_buffer(ty.value.type)) { console.log("Cannot buffer a complex type"); return null; }
 
         return new_result({
             value: new_type({

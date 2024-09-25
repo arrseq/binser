@@ -1,5 +1,5 @@
 # Binary Serializer
-A tool used to encode and decode complex binary structures.
+A __scuffed__ tool used to encode and decode complex binary structures.
 
 This library can be useful in a variety of situations:
 - When sending complex structured data between a server and client.
@@ -13,6 +13,20 @@ This library has many flaws that will not be fixed. They do not cause problems i
 - The parser is very basic, for example in many places you have to use a space after a comma `, `, `; `, and `: `.
 - The library does not have any good error handling. 
 - Extremely large numbers, arrays, enums and more can become misrepresented due to rounding from the javascript runtime. 
+- __Poor performance__ with complicated arrays or large arrays. Pros & Cons of `x:` vs generic. 
+  - Generic Pro: Arrays can be nested
+  - Generic Con: May become a bottleneck if the data is large, an enum switch between `x:`/generic is recommended for larger arrays.
+  - `x:` Pro: Extremely fast for large arrays.
+  - `x:` Con: Cannot contain an enum or array/vector as its type.
+
+# `x:` Buffered Indicator
+should be used for screen buffers. Whether enabled or not, this has no effect on the encoding/decoding result and only affects performance.
+ - Generic `[u8]` `[u8; 4]`
+ - Buffered `[x:u8]` `[u8; x:4]`
+
+Invalid buffered cases
+ - `[x:[u8]]`
+ - `[[u8]; x:4]`
 
 # TypeScript usage
 ```ts

@@ -1,4 +1,6 @@
 import {key_size, parse_type, Size, Type, TypeName} from "./type";
+import {BufferType} from "./buffer";
+import {Float16Array} from "@petamoriken/float16";
 
 export * as ty from "./type";
 
@@ -54,6 +56,49 @@ export class Decoder<T> {
         }
 
         return [arrayResult, pos - initialPos];
+    }
+
+    private read_array_buffer(length: bigint, itemType: Type, pos: bigint, buffer: Uint8Array): [BufferType, bigint] | null {
+        let initialPos = pos;
+        let end = Number(pos + length);
+        let slice = buffer.slice(Number(pos), end);
+
+        let view: BufferType = null;
+        switch (itemType.type) {
+            case TypeName.Bool:
+            case TypeName.Array:
+            case TypeName.Vector:
+            case TypeName.String:
+            case TypeName.Enum: return null;
+
+            case TypeName.U:
+                switch (itemType.size) {
+                    case Size.X8: view = new Uint8ClampedArray(slice); break;
+                    case Size.X16: view = new Uint16Array(slice); break;
+                    case Size.X32: view = new Uint32Array(slice); break;
+                    case Size.X64: view = new BigUint64Array(slice); break;
+                }
+                break;
+            case TypeName.I:
+                switch (itemType.size) {
+                    case Size.X8: view = new Int8Array(slice); break;
+                    case Size.X16: view = new Int16Array(slice); break;
+                    case Size.X32: view = new Int32Array(slice); break;
+                    case Size.X64: view = new BigInt64Array(slice); break;
+                }
+                break;
+            case TypeName.F16:
+                view = new Float16Array(slice);
+                break;
+            case TypeName.F32:
+                view = new Float32Array(slice);
+                break;
+            case TypeName.F64:
+                view = new Float64Array(slice);
+                break;
+        }
+
+        return [view, pos - initialPos];
     }
 
     private read_string(pos: bigint, buffer: Uint8Array): [string, bigint] | null {
