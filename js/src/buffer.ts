@@ -1,6 +1,6 @@
 import {Float16Array} from "@petamoriken/float16";
 
-export type BufferType = Uint8Array
+export type BufferType = Uint8ClampedArray
     | Uint16Array
     | Uint32Array
     | BigUint64Array

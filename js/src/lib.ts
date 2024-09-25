@@ -58,12 +58,37 @@ export class Decoder<T> {
         return [arrayResult, pos - initialPos];
     }
 
-    private read_array_buffer(length: bigint, itemType: Type, pos: bigint, buffer: Uint8Array): [BufferType, bigint] | null {
-        let initialPos = pos;
-        let end = Number(pos + length);
-        let slice = buffer.slice(Number(pos), end);
+    private buffered_size(itemType: Type): bigint | null {
+        switch (itemType.type) {
+            case TypeName.Bool:
+            case TypeName.Array:
+            case TypeName.Vector:
+            case TypeName.String:
+            case TypeName.Enum: return null;
 
+            case TypeName.U:
+            case TypeName.I:
+                switch (itemType.size) {
+                    case Size.X8: return 1n;
+                    case Size.X16: return 2n;
+                    case Size.X32: return 4n;
+                    case Size.X64: return 8n;
+                }
+            case TypeName.F16: return 2n;
+            case TypeName.F32: return 4n;
+            case TypeName.F64: return 8n;
+        }
+    }
+
+    private read_buffered_array(length: bigint, itemType: Type, pos: bigint, buffer: Uint8Array): [BufferType, bigint] | null {
+        let initialPos = pos;
+        let end = pos + length;
+        let end_number = Number(end);
+        let slice = buffer.slice(Number(pos), end_number);
         let view: BufferType = null;
+        let size = this.buffered_size(itemType);
+        if (size == null) { return null; }
+
         switch (itemType.type) {
             case TypeName.Bool:
             case TypeName.Array:
@@ -98,7 +123,7 @@ export class Decoder<T> {
                 break;
         }
 
-        return [view, pos - initialPos];
+        return [view, size * length];
     }
 
     private read_string(pos: bigint, buffer: Uint8Array): [string, bigint] | null {
@@ -182,13 +207,23 @@ export class Decoder<T> {
                 break;
             }
             case TypeName.Array: {
-                let arrayResult = this.read_array(ty.length, ty.item_type, pos, buffer);
-                if (arrayResult == null) {
-                    console.log("Cannot decode array");
-                    return null;
+                if (ty.buffered) {
+                    let buffered = this.read_buffered_array(ty.length, ty.item_type, pos, buffer);
+                    if (buffered == null) {
+                        console.log("Cannot read buffered array");
+                        return null;
+                    }
+                    res = buffered[0];
+                    pos += buffered[1];
+                } else {
+                    let arrayResult = this.read_array(ty.length, ty.item_type, pos, buffer);
+                    if (arrayResult == null) {
+                        console.log("Cannot decode array");
+                        return null;
+                    }
+                    res = arrayResult[0];
+                    pos += arrayResult[1];
                 }
-                res = arrayResult[0];
-                pos += arrayResult[1];
                 break;
             }
             case TypeName.Vector: {
@@ -198,13 +233,23 @@ export class Decoder<T> {
                     return null;
                 }
                 pos += lengthResult[1];
-                let arrayResult = this.read_array(lengthResult[0], ty.item_type, pos, buffer);
-                if (arrayResult == null) {
-                    console.log("Cannot decode vector");
-                    return null;
+                if (ty.buffered) {
+                    let buffered = this.read_buffered_array(lengthResult[0], ty.item_type, pos, buffer);
+                    if (buffered == null) {
+                        console.log("Cannot read buffered array");
+                        return null;
+                    }
+                    res = buffered[0];
+                    pos += buffered[1];
+                } else {
+                    let arrayResult = this.read_array(lengthResult[0], ty.item_type, pos, buffer);
+                    if (arrayResult == null) {
+                        console.log("Cannot decode vector");
+                        return null;
+                    }
+                    res = arrayResult[0];
+                    pos += arrayResult[1];
                 }
-                res = arrayResult[0];
-                pos += arrayResult[1];
                 break;
             }
             case TypeName.String: {
