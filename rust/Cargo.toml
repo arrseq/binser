@@ -6,3 +6,4 @@ description = "library for binary structure transporation"
 license = "MIT"
 
 [dependencies]
+bytemuck = "1.18.0"

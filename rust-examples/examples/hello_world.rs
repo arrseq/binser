@@ -5,7 +5,6 @@ use std::io::{Cursor, Seek};
 use xbinser::encoding::{Decoded, Encoded};
 use xbinser_macros::{EnumDecoded, EnumEncoded, StructDecoded, StructEncoded};
 
-
 #[derive(Debug, StructEncoded, StructDecoded, PartialEq)]
 struct TextContainer {
     text: String

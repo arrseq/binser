@@ -1,4 +1,5 @@
 use std::io;
+use bytemuck::cast_slice;
 
 pub trait Encoded {
     fn encode(&self, output: &mut impl io::Write) -> io::Result<()>;
@@ -66,7 +67,12 @@ impl<T: Decoded, const N: usize> Decoded for [T; N] {
     }
 }
 
-impl<T: Encoded> Encoded for Vec<T> {
+pub trait SlowType {}
+impl<T> SlowType for Vec<T> {}
+impl<T> SlowType for &[T] {}
+impl SlowType for &str {}
+
+impl<T: Encoded + SlowType> Encoded for &[T] {
     fn encode(&self, output: &mut impl io::Write) -> io::Result<()> {
         let length = self.len() as u64;
         output.write_all(&length.to_le_bytes())?;
@@ -78,6 +84,37 @@ impl<T: Encoded> Encoded for Vec<T> {
         Ok(())
     }
 }
+impl<T: Encoded + SlowType> Encoded for Vec<T> {
+    fn encode(&self, output: &mut impl io::Write) -> io::Result<()> {
+        let slice: &[T] = self;
+        slice.encode(output)
+    }
+}
+
+macro_rules! implement_array_type {
+    ($ty: ty) => {
+        impl Encoded for &[$ty] {
+            fn encode(&self, output: &mut impl io::Write) -> io::Result<()> {
+                output.write_all(&self.len().to_le_bytes())?;
+                output.write_all(cast_slice(self))
+            }
+        }
+        impl Encoded for Vec<$ty> {
+            fn encode(&self, output: &mut impl io::Write) -> io::Result<()> {
+                (self as &[$ty]).encode(output)
+            }
+        }
+    };
+}
+
+implement_array_type!(u8);
+implement_array_type!(u16);
+implement_array_type!(u32);
+implement_array_type!(u64);
+implement_array_type!(i8);
+implement_array_type!(i16);
+implement_array_type!(i32);
+implement_array_type!(i64);
 
 impl<T: Decoded> Decoded for Vec<T> {
     fn decode(input: &mut impl io::Read) -> io::Result<Self> {
@@ -96,14 +133,19 @@ impl<T: Decoded> Decoded for Vec<T> {
     }
 }
 
+impl Encoded for &str {
+    fn encode(&self, output: &mut impl io::Write) -> io::Result<()> {
+        output.write_all(self.as_bytes())
+    }
+}
 impl Encoded for String {
     fn encode(&self, output: &mut impl io::Write) -> io::Result<()> {
-        let bytes = self.as_bytes();
-        output.write_all(bytes)?;
-        Ok(())
+        (self as &str).encode(output)
     }
 }
 
+
+// todo: complete string
 impl Decoded for String {
     fn decode(input: &mut impl io::Read) -> io::Result<Self> {
         let mut bytes = Vec::new();
