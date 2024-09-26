@@ -1,5 +1,5 @@
-use std::io;
-use bytemuck::cast_slice;
+use std::io;use std::ops::{Deref, DerefMut};
+use bytemuck::{cast_slice, try_cast_slice};
 
 pub trait Encoded {
     fn encode(&self, output: &mut impl io::Write) -> io::Result<()>;
@@ -104,6 +104,21 @@ macro_rules! implement_array_type {
                 (self as &[$ty]).encode(output)
             }
         }
+
+        impl Decoded for Vec<$ty> {
+            fn decode(input: &mut impl io::Read) -> io::Result<Self> {
+                let length = {
+                    let mut buffer = [0u8; size_of::<u64>()];
+                    input.read_exact(&mut buffer)?;
+                    u64::from_le_bytes(buffer) as usize
+                };
+
+                let mut vec = vec![0u8; length];
+                input.read_exact(vec.deref_mut())?;
+                let slice = try_cast_slice(vec.deref()).map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+                Ok(Vec::from(slice))
+            }
+        }
     };
 }
 
@@ -116,7 +131,7 @@ implement_array_type!(i16);
 implement_array_type!(i32);
 implement_array_type!(i64);
 
-impl<T: Decoded> Decoded for Vec<T> {
+impl<T: Decoded + SlowType> Decoded for Vec<T> {
     fn decode(input: &mut impl io::Read) -> io::Result<Self> {
         let mut length_bytes = [0u8; 8];
         input.read_exact(&mut length_bytes)?;
@@ -143,7 +158,6 @@ impl Encoded for String {
         (self as &str).encode(output)
     }
 }
-
 
 // todo: complete string
 impl Decoded for String {
