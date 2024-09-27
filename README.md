@@ -1,5 +1,5 @@
 # Binary Serializer
-A __scuffed__ tool used to encode and decode complex binary structures.
+A __scuffed__ tool used to encode and decode complex binary structures. This encoding can be very fast for large data if used correctly.
 
 This library can be useful in a variety of situations:
 - When sending complex structured data between a server and client.

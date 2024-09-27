@@ -6,4 +6,4 @@ description = "library for binary structure transporation"
 license = "MIT"
 
 [dependencies]
-bytemuck = { version = "1.18.0", features = ["extern_crate_std"] }
+bytemuck = { version = "1.18.0", features = ["extern_crate_std", "min_const_generics"] }
