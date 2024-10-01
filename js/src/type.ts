@@ -124,7 +124,7 @@ export function parse_ktp(tstr: string): ParseResult<Ktp> | null {
         len += cs.length;
 
         let ty = parse_type(tstr);
-        if (ty == null) { console.log("Cannot parse KTP's type"); return null; }
+        if (ty == null) { console.log("Cannot parse KTP's type", tstr); return null; }
         len += ty.length;
 
         return new_result({
@@ -158,7 +158,7 @@ export function parse_object(o: string): ParseResult<[string, KtpM]> | null {
         }
 
         let ktp = parse_ktp(o);
-        if (ktp == null) { console.log("Invalid ktp"); return null; }
+        if (ktp == null) { console.log("Invalid ktp", o); return null; }
         l += ktp.length;
 
         type_out[ktp.value[0]] = ktp.value[1];

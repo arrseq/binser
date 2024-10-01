@@ -127,16 +127,16 @@ export class Decoder<T> {
     }
 
     private read_string(pos: bigint, buffer: Uint8Array): [string, bigint] | null {
-        const start = Number(pos);
+        const initial_position = pos;
         const decoder = new TextDecoder('utf-8');
 
-        let end = start;
-        while (end < buffer.length && buffer[end] !== 0x00) {
-            end++;
-        }
+        let end = this.read_u(Size.X64, initial_position, buffer);
+        if (end == null) return null;
+        pos += end[1];
+        let end_position = pos + end[0];
 
-        const value = decoder.decode(buffer.slice(start, end));
-        return [value, BigInt(end - start)];
+        const value = decoder.decode(buffer.slice(Number(pos), Number(end_position)));
+        return [value, BigInt(end_position - initial_position)];
     }
 
     public decode_type(ty: Type, pos: bigint, buffer: Uint8Array): [any, bigint] | null {
@@ -446,8 +446,9 @@ export class Decoder<T> {
 
     private encode_string(str: string): Uint8Array {
         const encoder = new TextEncoder();
-        let encodedString = encoder.encode(str);
-        return new Uint8Array([...encodedString, 0x00]);
+        let encoded_string = encoder.encode(str);
+        let length_bytes = this.encode_u(Size.X64, BigInt(str.length));
+        return new Uint8Array([...length_bytes, ...encoded_string]);
     }
 
     public encode_type(ty: Type, value: any): Uint8Array | null {

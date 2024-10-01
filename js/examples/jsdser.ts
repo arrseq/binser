@@ -1,12 +1,15 @@
 import {Decoder} from "../src/lib";
 
 let dec = new Decoder({
-    e: "[u8; x:3]"
+    e: "enum hi[a: string, b: string]"
 });
 
 let buffer = new Uint8Array([
-    // 3, 0, 0, 0, 0, 0, 0, 0, // length = 1
-    0, 255, 127             // data = [0, 255, 127]
+    0x00, // variant id
+    0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x68, 0x69, // hi
+    0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x62, 0x79, 0x65 // bye
 ]);
 
-console.log(dec.decode(0n, buffer));
+console.log(dec.decode(0n, buffer)[0]);
