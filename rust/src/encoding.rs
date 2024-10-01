@@ -155,7 +155,7 @@ impl<T: Decoded + SlowType> Decoded for Vec<T> {
 
 impl Encoded for &str {
     fn encode(&self, output: &mut impl io::Write) -> io::Result<()> {
-        output.write_all(self.as_bytes())
+        self.as_bytes().encode(output)
     }
 }
 impl Encoded for String {
@@ -166,12 +166,8 @@ impl Encoded for String {
 
 impl Decoded for String {
     fn decode(input: &mut impl io::Read) -> io::Result<Self> {
-        let mut bytes = Vec::new();
-        input.read_to_end(&mut bytes)?;
-
-        let decoded_string = String::from_utf8(bytes)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-
-        Ok(decoded_string)
+        let bytes = Vec::<u8>::decode(input)?;
+        String::from_utf8(bytes)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
     }
 }
