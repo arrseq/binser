@@ -257,7 +257,7 @@ export function parse_type(tstr: string): ParseResult<Type> | null {
         });
     }
 
-    let enum_word = "enum ";
+    let enum_word = "enum[";
     let cs = ", ";
     let ss = "; ";
     let string = "string";
@@ -281,7 +281,11 @@ export function parse_type(tstr: string): ParseResult<Type> | null {
             if (tstr.startsWith(cs)) {
                 tstr = tstr.substring(cs.length);
                 len += cs.length;
-            } else { break; }
+            } else if (tstr.startsWith("]")) {
+                len += 1;
+                break;
+            }
+            else { console.log("Expected enum closing"); return null }
         }
 
         return new_result({
